@@ -1,33 +1,53 @@
 name: E-Learning DBaaS Test
 
-on: [push]
+on:
+  push:
+    branches: [ "main" ]
 
 jobs:
   test-dbaas:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: elearning
+          MYSQL_USER: sakshi
+          MYSQL_PASSWORD: sakshi123
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+      - name: Install MySQL client
+        run: sudo apt-get install -y mysql-client
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Wait for MySQL to be ready
+        run: sleep 20
 
-      - name: Setup database
+      - name: Create tables and insert sample data
         run: |
-          python -c "from database import init_db; init_db()"
-          echo "Database setup complete."
+          mysql -h 127.0.0.1 -P 3306 -u sakshi -psakshi123 elearning <<EOF
+          CREATE TABLE students (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(50),
+            course VARCHAR(50)
+          );
+          INSERT INTO students (name, course) VALUES
+            ('Rahul', 'Data Science'),
+            ('Sakshi', 'Cloud Computing'),
+            ('Priya', 'Machine Learning');
+          EOF
 
-      - name: Run app and test endpoints
+      - name: Query the data
         run: |
-          python app.py &
-          sleep 5
-          curl http://127.0.0.1:8080/
-          curl http://127.0.0.1:8080/students
-          curl http://127.0.0.1:8080/courses
-          curl http://127.0.0.1:8080/enrollments
+          mysql -h 127.0.0.1 -P 3306 -u sakshi -psakshi123 elearning -e "SELECT * FROM students;"
